@@ -1,38 +1,53 @@
-#  coding: utf-8 
+
 import socketserver
-
-# Copyright 2013 Abram Hindle, Eddie Antonio Santos
-# 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# 
-#     http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-#
-# Furthermore it is derived from the Python documentation examples thus
-# some of the code is Copyright © 2001-2013 Python Software
-# Foundation; All Rights Reserved
-#
-# http://docs.python.org/2/library/socketserver.html
-#
-# run: python freetests.py
-
-# try: curl -v -X GET http://127.0.0.1:8080/
-
-
 class MyWebServer(socketserver.BaseRequestHandler):
-    
+
     def handle(self):
+
+        # Receive the request
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        self.data_tokens = self.data.decode().split()
+
+        # Initialize mime type and response code
+        self.mime = ""
+        self.response_code = ""
+
+        # Check if request is a GET
+        try:
+            self.response_type = self.data_tokens.index("GET")
+            self.response_content = self.data_tokens[self.response_type+1]
+
+        # If not a GET method, then not allowed - display 405 error
+        except:
+            self.response_code = "405 Method Not Allowed"
+            self.mime = "text/html"
+            self.page = "<html><body><h1>405 Method Not Allowed</h1></body></html>"
+
+        try:
+            # Set index.html if ends in /
+            if (self.response_content[-1] == "/"):
+                self.response_content += "index.html"
+
+            # Check if HTML or CSS and set respective mime type
+            if (len(self.response_content.split(".")) == 2):
+                if (self.response_content.split(".")[1] == "html"):
+                    self.mime = "text/html"
+                if (self.response_content.split(".")[1] == "css"):
+                    self.mime = "text/css"
+
+            # Read Requested file
+            with open("www" + self.response_content, "r") as f:
+                self.page = f.read()
+
+        except:
+            # 404 error
+            self.response_code = "404 Not Found"
+            self.mime = "text/html"
+            self.page = "<html><body><h1>404 Not Found</h1></body></html>"
+
+        # Send request
+        self.display = "HTTP/1.1 %s\nContent-Type: %s\r\n\r\n%s" % (self.response_code, self.mime, self.page)
+        self.request.sendall(bytearray(self.display,'utf-8'))
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
